@@ -17,18 +17,15 @@ class Worker(identifier: Int, others: Seq[Int]) extends Runnable {
   override def run(): Unit = {
     while (!stopped) {
       val messages = mailbox.dequeueAll(_ => true)
-      messages.foreach({
-        case Election(electionId, initiator, _) =>
-          state match {
-            case Disabled() => ()
-            case _ =>
-              sendMessage(initiator, Ok(electionId))
-              state = StartElection()
-          }
-
-        case Coordinator(id) =>
-          startWorking(id)
-        case _ => ()
+      messages.foreach(message => {
+        (state, message) match {
+          case (Disabled(), _) => ()
+          case (_, Coordinator(id)) => startWorking(id)
+          case (_, Election(electionId, initiator, _)) =>
+            sendMessage(initiator, Ok(electionId))
+            state = StartElection()
+          case _ => ()
+        }
       })
       state match {
         case Waiting() => waiting()
